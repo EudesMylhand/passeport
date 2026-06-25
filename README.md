@@ -109,3 +109,11 @@ passeporttrack/
 - Limitez le CORS a votre domaine reel (actuellement ouvert en `*`).
 - Activez HTTPS (automatique sur Render/Railway).
 - Ajoutez une politique de sauvegarde reguliere de la base MySQL.
+
+=== Comptes de demonstration ===
+super_admin          : <admin@passeporttrack.cg> / Admin@2026
+enrolement           : <enrolement@passeporttrack.cg> / Enrol@2026
+production           : <production@passeporttrack.cg> / Prod@2026
+produit              : <produit@passeporttrack.cg> / Produit@2026
+quarantaine          : <quarantaine@passeporttrack.cg> / Quar@2026
+reception_plaintes   : <reception@passeporttrack.cg> / Recept@2026
