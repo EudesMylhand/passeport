@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detail passeport - PasseportTrack</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="../css/style.css" rel="stylesheet">
+</head>
+<body>
+<div id="pt-sidebar" class="pt-sidebar"></div>
+<div class="pt-content">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <h4 class="d-inline">Detail du passeport</h4></div>
+    <span id="pt-user-label" class="text-muted small"></span>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="card p-3" id="infosPasseport"></div>
+    </div>
+    <div class="col-md-7">
+      <div class="card p-3">
+        <h6>Historique de production</h6>
+        <ul class="list-group list-group-flush small" id="historique"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+const user = requireAuth();
+renderSidebar('');
+const idPasseport = new URLSearchParams(window.location.search).get('id');
+
+async function charger() {
+  try {
+    const p = await apiFetch(`/passports/${idPasseport}`);
+    document.getElementById('infosPasseport').innerHTML = `
+      <h5>${p.nom} ${p.prenoms} ${badgeStatut(p.statut)}</h5>
+      <table class="table table-sm mt-2">
+        <tr><th>Numero</th><td>${p.numero_passeport || '-'}</td></tr>
+        <tr><th>Sexe</th><td>${p.sexe}</td></tr>
+        <tr><th>Date de naissance</th><td>${p.date_naissance || '-'}</td></tr>
+        <tr><th>Date d'enrolement</th><td>${p.date_enrolement || '-'}</td></tr>
+        <tr><th>Motif quarantaine</th><td>${p.motif_quarantaine || '-'}</td></tr>
+        <tr><th>Date livraison</th><td>${p.date_livraison ? new Date(p.date_livraison).toLocaleString('fr-FR') : '-'}</td></tr>
+        <tr><th>Destinataire</th><td>${p.destinataire || '-'}</td></tr>
+      </table>
+      ${p.statut === 'livre' ? `<button class="btn btn-sm btn-outline-success" onclick="window.open('/api/passports/${p.id}/accuse-reception','_blank')"><i class="bi bi-file-pdf"></i> Telecharger l'accuse de reception</button>` : ''}
+    `;
+    document.getElementById('historique').innerHTML = (p.historique || []).map(h => `
+      <li class="list-group-item">
+        <strong>${h.ancien_statut || 'Creation'} → ${h.nouveau_statut}</strong><br>
+        <span class="text-muted">${h.utilisateur} — ${new Date(h.date_modification).toLocaleString('fr-FR')}</span>
+        ${h.commentaire ? `<br><em>${h.commentaire}</em>` : ''}
+      </li>`).join('') || '<li class="list-group-item text-muted">Aucun historique.</li>';
+  } catch (err) {
+    document.getElementById('infosPasseport').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+  }
+}
+charger();
+</script>
+</body>
+</html>

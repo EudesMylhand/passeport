@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plaintes - PasseportTrack</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="../css/style.css" rel="stylesheet">
+</head>
+<body>
+<div id="pt-sidebar" class="pt-sidebar"></div>
+<div class="pt-content">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <h4 class="d-inline">Gestion des plaintes</h4></div>
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNouvelle"><i class="bi bi-plus-circle"></i> Nouvelle plainte</button>
+      <span id="pt-user-label" class="text-muted small"></span>
+    </div>
+  </div>
+
+  <div class="card p-3">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead><tr><th>Dossier</th><th>Passeport</th><th>Description</th><th>Statut</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalNouvelle" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Nouvelle plainte</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label small">ID du passeport concerne</label>
+      <input type="number" class="form-control mb-2" id="nPassportId">
+      <label class="form-label small">Description</label>
+      <textarea class="form-control" id="nDescription" rows="3"></textarea>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" onclick="creerPlainte()">Enregistrer</button></div>
+  </div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+const user = requireAuth(['super_admin', 'reception_plaintes']);
+renderSidebar('plaintes.html');
+connectNotifications();
+
+const labelsStatut = { ouverte: 'warning', en_cours: 'info', resolue: 'success' };
+
+async function chargerListe() {
+  const plaintes = await apiFetch('/complaints');
+  document.getElementById('tableBody').innerHTML = plaintes.map(pl => `
+    <tr>
+      <td>${pl.numero_dossier}</td><td>#${pl.passport_id}</td><td>${pl.description}</td>
+      <td><span class="badge bg-${labelsStatut[pl.statut] || 'secondary'}">${pl.statut}</span></td>
+      <td>${new Date(pl.date).toLocaleDateString('fr-FR')}</td>
+      <td>
+        ${pl.statut !== 'resolue' ? `
+        <button class="btn btn-sm btn-outline-info" onclick="changerStatutPlainte(${pl.id}, 'en_cours')">En cours</button>
+        <button class="btn btn-sm btn-outline-success" onclick="resoudrePlainte(${pl.id})">Resoudre</button>` : '<span class="text-muted small">Cloturee</span>'}
+      </td>
+    </tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">Aucune plainte enregistree.</td></tr>';
+}
+
+async function creerPlainte() {
+  try {
+    await apiFetch('/complaints', {
+      method: 'POST',
+      body: JSON.stringify({
+        passport_id: parseInt(document.getElementById('nPassportId').value),
+        description: document.getElementById('nDescription').value
+      })
+    });
+    bootstrap.Modal.getInstance(document.getElementById('modalNouvelle')).hide();
+    chargerListe();
+  } catch (err) { alert(err.message); }
+}
+
+async function changerStatutPlainte(id, statut) {
+  await apiFetch(`/complaints/${id}/statut`, { method: 'PATCH', body: JSON.stringify({ statut }) });
+  chargerListe();
+}
+
+async function resoudrePlainte(id) {
+  const resolution = prompt('Resolution apportee :');
+  if (resolution === null) return;
+  await apiFetch(`/complaints/${id}/statut`, { method: 'PATCH', body: JSON.stringify({ statut: 'resolue', resolution }) });
+  chargerListe();
+}
+chargerListe();
+</script>
+</body>
+</html>

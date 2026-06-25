@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quarantaine - PasseportTrack</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="../css/style.css" rel="stylesheet">
+</head>
+<body>
+<div id="pt-sidebar" class="pt-sidebar"></div>
+<div class="pt-content">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <h4 class="d-inline">Passeports en quarantaine</h4></div>
+    <span id="pt-user-label" class="text-muted small"></span>
+  </div>
+
+  <div class="card p-3 mb-3">
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control form-control-sm" id="fNom" placeholder="Filtrer par nom" oninput="chargerListe()"></div>
+      <div class="col-md-4"><input class="form-control form-control-sm" id="fMotif" placeholder="Filtrer par motif" oninput="chargerListe()"></div>
+    </div>
+  </div>
+
+  <div class="card p-3">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead><tr><th>ID</th><th>Nom</th><th>Prenoms</th><th>Date</th><th>Motif</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+const user = requireAuth(['super_admin', 'quarantaine']);
+renderSidebar('quarantaine.html');
+
+async function chargerListe() {
+  const params = new URLSearchParams({ statut: 'quarantaine', limit: 100, nom: document.getElementById('fNom').value });
+  const res = await apiFetch(`/passports?${params}`);
+  const motifFiltre = document.getElementById('fMotif').value.toLowerCase();
+  const data = res.data.filter(p => !motifFiltre || (p.motif_quarantaine || '').toLowerCase().includes(motifFiltre));
+  document.getElementById('tableBody').innerHTML = data.map(p => `
+    <tr><td>${p.id}</td><td>${p.nom}</td><td>${p.prenoms}</td><td>${p.date_enrolement || '-'}</td>
+    <td>${p.motif_quarantaine || '<span class="text-muted">Non precise</span>'}</td></tr>
+  `).join('') || '<tr><td colspan="5" class="text-center text-muted">Aucun passeport en quarantaine.</td></tr>';
+}
+chargerListe();
+</script>
+</body>
+</html>

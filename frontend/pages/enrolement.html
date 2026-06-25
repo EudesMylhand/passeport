@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enrolement - PasseportTrack</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="../css/style.css" rel="stylesheet">
+</head>
+<body>
+<div id="pt-sidebar" class="pt-sidebar"></div>
+<div class="pt-content">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><button class="btn btn-sm btn-outline-secondary me-2" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <h4 class="d-inline">Enrolement</h4></div>
+    <span id="pt-user-label" class="text-muted small"></span>
+  </div>
+
+  <div class="card p-3 mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small">Importer un fichier (CSV, XLSX, TXT)</label>
+        <input type="file" id="fileInput" class="form-control" accept=".csv,.xlsx,.xls,.txt">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-success w-100" onclick="importerFichier()"><i class="bi bi-upload"></i> Importer</button>
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#modalAjout"><i class="bi bi-plus-circle"></i> Ajouter manuellement</button>
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-secondary w-100" onclick="exporterExcel()"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
+      </div>
+    </div>
+    <div id="importResult" class="mt-2 small"></div>
+  </div>
+
+  <div class="card p-3">
+    <div class="row g-2 mb-3">
+      <div class="col-md-3"><input class="form-control form-control-sm" id="fNom" placeholder="Filtrer par nom" oninput="chargerListe()"></div>
+      <div class="col-md-3"><input class="form-control form-control-sm" id="fPrenoms" placeholder="Filtrer par prenoms" oninput="chargerListe()"></div>
+      <div class="col-md-3"><input type="date" class="form-control form-control-sm" id="fDate" onchange="chargerListe()"></div>
+      <div class="col-md-3"><input class="form-control form-control-sm" id="fSearch" placeholder="Recherche instantanee" oninput="chargerListe()"></div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead><tr><th>ID</th><th>Nom</th><th>Prenoms</th><th>Date enrolement</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <nav><ul class="pagination pagination-sm" id="pagination"></ul></nav>
+  </div>
+</div>
+
+<div class="modal fade" id="modalAjout" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Nouvel enrolement</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <form id="formAjout">
+          <div class="mb-2"><label class="form-label small">Nom</label><input class="form-control" id="aNom" required></div>
+          <div class="mb-2"><label class="form-label small">Prenoms</label><input class="form-control" id="aPrenoms" required></div>
+          <div class="mb-2"><label class="form-label small">Sexe</label>
+            <select class="form-select" id="aSexe"><option value="M">Masculin</option><option value="F">Feminin</option></select></div>
+          <div class="mb-2"><label class="form-label small">Date de naissance</label><input type="date" class="form-control" id="aDateNaissance"></div>
+        </form>
+      </div>
+      <div class="modal-footer"><button class="btn btn-success" onclick="ajouterPasseport()">Enregistrer</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+const user = requireAuth(['super_admin', 'enrolement']);
+renderSidebar('enrolement.html');
+connectNotifications();
+let page = 1;
+
+async function chargerListe() {
+  const params = new URLSearchParams({
+    page, limit: 10,
+    nom: document.getElementById('fNom').value,
+    prenoms: document.getElementById('fPrenoms').value,
+    date_enrolement: document.getElementById('fDate').value,
+    search: document.getElementById('fSearch').value
+  });
+  const res = await apiFetch(`/passports?${params}`);
+  document.getElementById('tableBody').innerHTML = res.data.map(p => `
+    <tr>
+      <td>${p.id}</td><td>${p.nom}</td><td>${p.prenoms}</td>
+      <td>${p.date_enrolement || '-'}</td><td>${badgeStatut(p.statut)}</td>
+      <td><button class="btn btn-sm btn-outline-primary" onclick="voirDetail(${p.id})"><i class="bi bi-eye"></i></button></td>
+    </tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">Aucun resultat.</td></tr>';
+
+  document.getElementById('pagination').innerHTML = Array.from({ length: res.pages }, (_, i) => `
+    <li class="page-item ${i + 1 === res.page ? 'active' : ''}">
+      <a class="page-link" href="#" onclick="page=${i + 1};chargerListe();return false;">${i + 1}</a>
+    </li>`).join('');
+}
+
+async function importerFichier() {
+  const input = document.getElementById('fileInput');
+  if (!input.files.length) return alert('Choisissez un fichier.');
+  const fd = new FormData();
+  fd.append('fichier', input.files[0]);
+  document.getElementById('importResult').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Importation en cours...';
+  try {
+    const res = await apiFetch('/import', { method: 'POST', body: fd });
+    document.getElementById('importResult').innerHTML =
+      `<span class="text-success">${res.importes} importe(s), ${res.doublons} doublon(s), ${res.erreurs} erreur(s) sur ${res.total_lignes} ligne(s).</span>`;
+    chargerListe();
+  } catch (err) {
+    document.getElementById('importResult').innerHTML = `<span class="text-danger">${err.message}</span>`;
+  }
+}
+
+async function ajouterPasseport() {
+  try {
+    await apiFetch('/passports', {
+      method: 'POST',
+      body: JSON.stringify({
+        nom: document.getElementById('aNom').value,
+        prenoms: document.getElementById('aPrenoms').value,
+        sexe: document.getElementById('aSexe').value,
+        date_naissance: document.getElementById('aDateNaissance').value
+      })
+    });
+    bootstrap.Modal.getInstance(document.getElementById('modalAjout')).hide();
+    document.getElementById('formAjout').reset();
+    chargerListe();
+  } catch (err) { alert(err.message); }
+}
+
+function voirDetail(id) { window.location.href = `detail.html?id=${id}`; }
+function exporterExcel() { window.open('/api/reports/export/passeports', '_blank'); }
+
+chargerListe();
+</script>
+</body>
+</html>
